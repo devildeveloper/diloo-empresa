@@ -1394,7 +1394,8 @@ module.exports =
     function App() {
       _classCallCheck(this, App);
   
-      _get(Object.getPrototypeOf(App.prototype), 'constructor', this).apply(this, arguments);
+      _get(Object.getPrototypeOf(App.prototype), 'constructor', this).call(this);
+      this.state = { posY: 0, posX: 0 };
     }
   
     _createClass(App, [{
@@ -1407,6 +1408,14 @@ module.exports =
           onSetMeta: context.onSetMeta || _fbjsLibEmptyFunction2['default'],
           onPageNotFound: context.onPageNotFound || _fbjsLibEmptyFunction2['default']
         };
+      }
+    }, {
+      key: 'mover',
+      value: function mover(e) {
+  
+        var x = (window.innerWidth / 2 - e.pageX) * 0.005;
+        var y = (window.innerHeight / 2 - e.pageY) * 0.005;
+        this.setState({ posY: y, posX: x });
       }
     }, {
       key: 'componentWillMount',
@@ -1423,9 +1432,9 @@ module.exports =
       value: function render() {
         return !this.props.error ? _react2['default'].createElement(
           'div',
-          null,
+          { onMouseMove: this.mover.bind(this) },
           this.props.children,
-          _react2['default'].createElement('div', { className: _AppScss2['default'].fullvideo, style: { backgroundImage: 'url(/fondo.jpg)' } })
+          _react2['default'].createElement('div', { className: _AppScss2['default'].fullvideo, style: { backgroundImage: 'url(/fondo.jpg)', transform: 'translateX(-' + (50 - this.state.posX) + '%) translateY(-' + (50 - this.state.posY) + '%)' } })
         ) : this.props.children;
       }
     }], [{
@@ -1490,7 +1499,7 @@ module.exports =
   
   
   // module
-  exports.push([module.id, "/*! normalize.css v3.0.3 | MIT License | github.com/necolas/normalize.css */html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}body{margin:0}article,aside,details,figcaption,figure,footer,header,hgroup,main,menu,nav,section,summary{display:block}audio,canvas,progress,video{display:inline-block;vertical-align:baseline}audio:not([controls]){display:none;height:0}[hidden],template{display:none}a{background-color:transparent}a:active,a:hover{outline:0}abbr[title]{border-bottom:1px dotted}b,strong{font-weight:700}dfn{font-style:italic}h1{font-size:2em;margin:.67em 0}mark{background:#ff0;color:#000}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sup{top:-.5em}sub{bottom:-.25em}img{border:0}svg:not(:root){overflow:hidden}figure{margin:1em 40px}hr{box-sizing:content-box;height:0}pre{overflow:auto}code,kbd,pre,samp{font-family:monospace;font-size:1em}button,input,optgroup,select,textarea{color:inherit;font:inherit;margin:0}button{overflow:visible}button,select{text-transform:none}button,html input[type=button],input[type=reset],input[type=submit]{-webkit-appearance:button;cursor:pointer}button[disabled],html input[disabled]{cursor:default}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}input{line-height:normal}input[type=checkbox],input[type=radio]{box-sizing:border-box;padding:0}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{height:auto}input[type=search]{-webkit-appearance:textfield;box-sizing:content-box}input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none}fieldset{border:1px solid silver;margin:0 2px;padding:.35em .625em .75em}legend{border:0;padding:0}textarea{overflow:auto}optgroup{font-weight:700}table{border-collapse:collapse;border-spacing:0}td,th{padding:0}\r\n\r\n/*! React Starter Kit | MIT License | https://www.reactstarterkit.com/ */html{color:#222;font-weight:100;font-size:1em;font-family:Open Sans,HelveticaNeue-Light,sans-serif;line-height:1.375;width:100vw;background-color:#000}body,html{overflow-x:hidden}body{max-width:100vw}::-moz-selection{background:#b3d4fc;text-shadow:none}::selection{background:#b3d4fc;text-shadow:none}hr{display:block;height:1px;border:0;border-top:1px solid #ccc;margin:1em 0;padding:0}audio,canvas,iframe,img,svg,video{vertical-align:middle}fieldset{border:0;margin:0;padding:0}textarea{resize:vertical}.App_browserupgrade_1wH{margin:.2em 0;background:#ccc;color:#000;padding:.2em 0}@media print{*,:after,:before{background:transparent!important;color:#000!important;box-shadow:none!important;text-shadow:none!important}a,a:visited{text-decoration:underline}a[href]:after{content:\" (\" attr(href) \")\"}abbr[title]:after{content:\" (\" attr(title) \")\"}a[href^=\"#\"]:after,a[href^=\"javascript:\"]:after{content:\"\"}blockquote,pre{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}img,tr{page-break-inside:avoid}img{max-width:100%!important}h2,h3,p{orphans:3;widows:3}h2,h3{page-break-after:avoid}}.App_fullvideo_AfG{position:fixed;top:50%;left:50%;min-width:100%;min-height:100%;width:auto;height:auto;z-index:-100;-webkit-transform:translateX(-50%) translateY(-50%);transform:translateX(-50%) translateY(-50%);background-size:cover}", ""]);
+  exports.push([module.id, "/*! normalize.css v3.0.3 | MIT License | github.com/necolas/normalize.css */html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}body{margin:0}article,aside,details,figcaption,figure,footer,header,hgroup,main,menu,nav,section,summary{display:block}audio,canvas,progress,video{display:inline-block;vertical-align:baseline}audio:not([controls]){display:none;height:0}[hidden],template{display:none}a{background-color:transparent}a:active,a:hover{outline:0}abbr[title]{border-bottom:1px dotted}b,strong{font-weight:700}dfn{font-style:italic}h1{font-size:2em;margin:.67em 0}mark{background:#ff0;color:#000}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sup{top:-.5em}sub{bottom:-.25em}img{border:0}svg:not(:root){overflow:hidden}figure{margin:1em 40px}hr{box-sizing:content-box;height:0}pre{overflow:auto}code,kbd,pre,samp{font-family:monospace;font-size:1em}button,input,optgroup,select,textarea{color:inherit;font:inherit;margin:0}button{overflow:visible}button,select{text-transform:none}button,html input[type=button],input[type=reset],input[type=submit]{-webkit-appearance:button;cursor:pointer}button[disabled],html input[disabled]{cursor:default}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}input{line-height:normal}input[type=checkbox],input[type=radio]{box-sizing:border-box;padding:0}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{height:auto}input[type=search]{-webkit-appearance:textfield;box-sizing:content-box}input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none}fieldset{border:1px solid silver;margin:0 2px;padding:.35em .625em .75em}legend{border:0;padding:0}textarea{overflow:auto}optgroup{font-weight:700}table{border-collapse:collapse;border-spacing:0}td,th{padding:0}\r\n\r\n/*! React Starter Kit | MIT License | https://www.reactstarterkit.com/ */html{color:#222;font-weight:100;font-size:1em;font-family:Open Sans,HelveticaNeue-Light,sans-serif;line-height:1.375;width:100vw;background-color:#000}body,html{overflow-x:hidden}body{max-width:100vw}::-moz-selection{background:#b3d4fc;text-shadow:none}::selection{background:#b3d4fc;text-shadow:none}hr{display:block;height:1px;border:0;border-top:1px solid #ccc;margin:1em 0;padding:0}audio,canvas,iframe,img,svg,video{vertical-align:middle}fieldset{border:0;margin:0;padding:0}textarea{resize:vertical}.App_browserupgrade_1wH{margin:.2em 0;background:#ccc;color:#000;padding:.2em 0}@media print{*,:after,:before{background:transparent!important;color:#000!important;box-shadow:none!important;text-shadow:none!important}a,a:visited{text-decoration:underline}a[href]:after{content:\" (\" attr(href) \")\"}abbr[title]:after{content:\" (\" attr(title) \")\"}a[href^=\"#\"]:after,a[href^=\"javascript:\"]:after{content:\"\"}blockquote,pre{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}img,tr{page-break-inside:avoid}img{max-width:100%!important}h2,h3,p{orphans:3;widows:3}h2,h3{page-break-after:avoid}}.App_fullvideo_AfG{position:fixed;top:50%;left:50%;min-width:120%;min-height:120%;width:auto;height:auto;z-index:-100;-webkit-transform:translateX(-50%) translateY(-50%);transform:translateX(-50%) translateY(-50%);background-size:cover}", ""]);
   
   // exports
   exports.locals = {
@@ -3051,12 +3060,22 @@ module.exports =
     }
   
     _createClass(Header, [{
+      key: 'toggle',
+      value: function toggle() {
+        this.setState({ open: 1 });
+      }
+    }, {
+      key: 'toggleOut',
+      value: function toggleOut() {
+        this.setState({ open: 0 });
+      }
+    }, {
       key: 'render',
       value: function render() {
         var cl = (0, _classnames2['default'])(_HeaderScss2['default'].root);
         var minilogo = (0, _classnames2['default'])(_HeaderScss2['default'].lefy);
         var logo = (0, _classnames2['default'])(_HeaderScss2['default'].logo, _HeaderScss2['default'].hide);
-        if (this.props.open_menu == 1) {
+        if (this.props.open_menu == 1 || this.state.open == 1) {
           cl = (0, _classnames2['default'])(_HeaderScss2['default'].root, _HeaderScss2['default'].open);
           minilogo = (0, _classnames2['default'])(_HeaderScss2['default'].lefy, _HeaderScss2['default'].hide);
           logo = (0, _classnames2['default'])(_HeaderScss2['default'].logo);
@@ -3065,7 +3084,7 @@ module.exports =
         console.log(this.props);
         return _react2['default'].createElement(
           'div',
-          { className: cl },
+          { className: cl, onMouseOver: this.toggle.bind(this), onMouseOut: this.toggleOut.bind(this) },
           _react2['default'].createElement(
             'button',
             { className: _HeaderScss2['default'].btn_menu, onClick: this.props.toggle.bind(this) },
