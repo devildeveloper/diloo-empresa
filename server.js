@@ -2907,7 +2907,7 @@ module.exports =
                   _react2['default'].createElement(
                     'div',
                     { className: _InitPageScss2['default'].client_holder },
-                    _react2['default'].createElement('img', { src: '/logos/BNP_cardif.png' })
+                    _react2['default'].createElement('img', { src: '/logos/bnp_cardif.png' })
                   ),
                   _react2['default'].createElement(
                     'div',
@@ -2927,7 +2927,7 @@ module.exports =
                   _react2['default'].createElement(
                     'div',
                     { className: _InitPageScss2['default'].client_holder },
-                    _react2['default'].createElement('img', { src: '/logos/Rimac.png' })
+                    _react2['default'].createElement('img', { src: '/logos/rimac.png' })
                   ),
                   _react2['default'].createElement(
                     'div',
