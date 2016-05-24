@@ -685,7 +685,7 @@ module.exports =
                 break;
               }
   
-              state.statusCode = 200;
+              state.statusCode = typeof state.statusCode === 'number' ? state.statusCode : 200;
               cb(state, result);
               return context$2$0.abrupt('return');
   
@@ -827,8 +827,8 @@ module.exports =
   /**
    * Parse a string for the raw tokens.
    *
-   * @param  {String} str
-   * @return {Array}
+   * @param  {string} str
+   * @return {!Array}
    */
   function parse (str) {
     var tokens = []
@@ -850,22 +850,24 @@ module.exports =
         continue
       }
   
+      var next = str[index]
+      var prefix = res[2]
+      var name = res[3]
+      var capture = res[4]
+      var group = res[5]
+      var modifier = res[6]
+      var asterisk = res[7]
+  
       // Push the current path onto the tokens.
       if (path) {
         tokens.push(path)
         path = ''
       }
   
-      var prefix = res[2]
-      var name = res[3]
-      var capture = res[4]
-      var group = res[5]
-      var suffix = res[6]
-      var asterisk = res[7]
-  
-      var repeat = suffix === '+' || suffix === '*'
-      var optional = suffix === '?' || suffix === '*'
-      var delimiter = prefix || '/'
+      var partial = prefix != null && next != null && next !== prefix
+      var repeat = modifier === '+' || modifier === '*'
+      var optional = modifier === '?' || modifier === '*'
+      var delimiter = res[2] || '/'
       var pattern = capture || group || (asterisk ? '.*' : '[^' + delimiter + ']+?')
   
       tokens.push({
@@ -874,6 +876,8 @@ module.exports =
         delimiter: delimiter,
         optional: optional,
         repeat: repeat,
+        partial: partial,
+        asterisk: !!asterisk,
         pattern: escapeGroup(pattern)
       })
     }
@@ -894,11 +898,35 @@ module.exports =
   /**
    * Compile a string to a template function for the path.
    *
-   * @param  {String}   str
-   * @return {Function}
+   * @param  {string}             str
+   * @return {!function(Object=, Object=)}
    */
   function compile (str) {
     return tokensToFunction(parse(str))
+  }
+  
+  /**
+   * Prettier encoding of URI path segments.
+   *
+   * @param  {string}
+   * @return {string}
+   */
+  function encodeURIComponentPretty (str) {
+    return encodeURI(str).replace(/[\/?#]/g, function (c) {
+      return '%' + c.charCodeAt(0).toString(16).toUpperCase()
+    })
+  }
+  
+  /**
+   * Encode the asterisk parameter. Similar to `pretty`, but allows slashes.
+   *
+   * @param  {string}
+   * @return {string}
+   */
+  function encodeAsterisk (str) {
+    return encodeURI(str).replace(/[?#]/g, function (c) {
+      return '%' + c.charCodeAt(0).toString(16).toUpperCase()
+    })
   }
   
   /**
@@ -911,13 +939,15 @@ module.exports =
     // Compile all the patterns before compilation.
     for (var i = 0; i < tokens.length; i++) {
       if (typeof tokens[i] === 'object') {
-        matches[i] = new RegExp('^' + tokens[i].pattern + '$')
+        matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$')
       }
     }
   
-    return function (obj) {
+    return function (obj, opts) {
       var path = ''
       var data = obj || {}
+      var options = opts || {}
+      var encode = options.pretty ? encodeURIComponentPretty : encodeURIComponent
   
       for (var i = 0; i < tokens.length; i++) {
         var token = tokens[i]
@@ -933,6 +963,11 @@ module.exports =
   
         if (value == null) {
           if (token.optional) {
+            // Prepend partial segment prefixes.
+            if (token.partial) {
+              path += token.prefix
+            }
+  
             continue
           } else {
             throw new TypeError('Expected "' + token.name + '" to be defined')
@@ -941,7 +976,7 @@ module.exports =
   
         if (isarray(value)) {
           if (!token.repeat) {
-            throw new TypeError('Expected "' + token.name + '" to not repeat, but received "' + value + '"')
+            throw new TypeError('Expected "' + token.name + '" to not repeat, but received `' + JSON.stringify(value) + '`')
           }
   
           if (value.length === 0) {
@@ -953,10 +988,10 @@ module.exports =
           }
   
           for (var j = 0; j < value.length; j++) {
-            segment = encodeURIComponent(value[j])
+            segment = encode(value[j])
   
             if (!matches[i].test(segment)) {
-              throw new TypeError('Expected all "' + token.name + '" to match "' + token.pattern + '", but received "' + segment + '"')
+              throw new TypeError('Expected all "' + token.name + '" to match "' + token.pattern + '", but received `' + JSON.stringify(segment) + '`')
             }
   
             path += (j === 0 ? token.prefix : token.delimiter) + segment
@@ -965,7 +1000,7 @@ module.exports =
           continue
         }
   
-        segment = encodeURIComponent(value)
+        segment = token.asterisk ? encodeAsterisk(value) : encode(value)
   
         if (!matches[i].test(segment)) {
           throw new TypeError('Expected "' + token.name + '" to match "' + token.pattern + '", but received "' + segment + '"')
@@ -981,8 +1016,8 @@ module.exports =
   /**
    * Escape a regular expression string.
    *
-   * @param  {String} str
-   * @return {String}
+   * @param  {string} str
+   * @return {string}
    */
   function escapeString (str) {
     return str.replace(/([.+*?=^!:${}()[\]|\/])/g, '\\$1')
@@ -991,8 +1026,8 @@ module.exports =
   /**
    * Escape the capturing group by escaping special characters and meaning.
    *
-   * @param  {String} group
-   * @return {String}
+   * @param  {string} group
+   * @return {string}
    */
   function escapeGroup (group) {
     return group.replace(/([=!:$\/()])/g, '\\$1')
@@ -1001,9 +1036,9 @@ module.exports =
   /**
    * Attach the keys as a property of the regexp.
    *
-   * @param  {RegExp} re
-   * @param  {Array}  keys
-   * @return {RegExp}
+   * @param  {!RegExp} re
+   * @param  {Array}   keys
+   * @return {!RegExp}
    */
   function attachKeys (re, keys) {
     re.keys = keys
@@ -1014,7 +1049,7 @@ module.exports =
    * Get the flags for a regexp from the options.
    *
    * @param  {Object} options
-   * @return {String}
+   * @return {string}
    */
   function flags (options) {
     return options.sensitive ? '' : 'i'
@@ -1023,9 +1058,9 @@ module.exports =
   /**
    * Pull out keys from a regexp.
    *
-   * @param  {RegExp} path
-   * @param  {Array}  keys
-   * @return {RegExp}
+   * @param  {!RegExp} path
+   * @param  {!Array}  keys
+   * @return {!RegExp}
    */
   function regexpToRegexp (path, keys) {
     // Use a negative lookahead to match only capturing groups.
@@ -1039,6 +1074,8 @@ module.exports =
           delimiter: null,
           optional: false,
           repeat: false,
+          partial: false,
+          asterisk: false,
           pattern: null
         })
       }
@@ -1050,10 +1087,10 @@ module.exports =
   /**
    * Transform an array into a regexp.
    *
-   * @param  {Array}  path
-   * @param  {Array}  keys
-   * @param  {Object} options
-   * @return {RegExp}
+   * @param  {!Array}  path
+   * @param  {Array}   keys
+   * @param  {!Object} options
+   * @return {!RegExp}
    */
   function arrayToRegexp (path, keys, options) {
     var parts = []
@@ -1070,10 +1107,10 @@ module.exports =
   /**
    * Create a path regexp from string input.
    *
-   * @param  {String} path
-   * @param  {Array}  keys
-   * @param  {Object} options
-   * @return {RegExp}
+   * @param  {string}  path
+   * @param  {!Array}  keys
+   * @param  {!Object} options
+   * @return {!RegExp}
    */
   function stringToRegexp (path, keys, options) {
     var tokens = parse(path)
@@ -1092,10 +1129,9 @@ module.exports =
   /**
    * Expose a function for taking tokens and returning a RegExp.
    *
-   * @param  {Array}  tokens
-   * @param  {Array}  keys
-   * @param  {Object} options
-   * @return {RegExp}
+   * @param  {!Array}  tokens
+   * @param  {Object=} options
+   * @return {!RegExp}
    */
   function tokensToRegExp (tokens, options) {
     options = options || {}
@@ -1114,17 +1150,17 @@ module.exports =
         route += escapeString(token)
       } else {
         var prefix = escapeString(token.prefix)
-        var capture = token.pattern
+        var capture = '(?:' + token.pattern + ')'
   
         if (token.repeat) {
           capture += '(?:' + prefix + capture + ')*'
         }
   
         if (token.optional) {
-          if (prefix) {
+          if (!token.partial) {
             capture = '(?:' + prefix + '(' + capture + '))?'
           } else {
-            capture = '(' + capture + ')?'
+            capture = prefix + '(' + capture + ')?'
           }
         } else {
           capture = prefix + '(' + capture + ')'
@@ -1160,30 +1196,30 @@ module.exports =
    * placeholder key descriptions. For example, using `/user/:id`, `keys` will
    * contain `[{ name: 'id', delimiter: '/', optional: false, repeat: false }]`.
    *
-   * @param  {(String|RegExp|Array)} path
-   * @param  {Array}                 [keys]
-   * @param  {Object}                [options]
-   * @return {RegExp}
+   * @param  {(string|RegExp|Array)} path
+   * @param  {(Array|Object)=}       keys
+   * @param  {Object=}               options
+   * @return {!RegExp}
    */
   function pathToRegexp (path, keys, options) {
     keys = keys || []
   
     if (!isarray(keys)) {
-      options = keys
+      options = /** @type {!Object} */ (keys)
       keys = []
     } else if (!options) {
       options = {}
     }
   
     if (path instanceof RegExp) {
-      return regexpToRegexp(path, keys, options)
+      return regexpToRegexp(path, /** @type {!Array} */ (keys))
     }
   
     if (isarray(path)) {
-      return arrayToRegexp(path, keys, options)
+      return arrayToRegexp(/** @type {!Array} */ (path), /** @type {!Array} */ (keys), options)
     }
   
-    return stringToRegexp(path, keys, options)
+    return stringToRegexp(/** @type {string} */ (path), /** @type {!Array} */ (keys), options)
   }
 
 
@@ -2485,16 +2521,28 @@ module.exports =
       value: function componentWillMount() {
         this.context.onSetTitle(title);
       }
+  
+      /*  shouldComponentUpdate(nextProps, nextState){
+          if(nextProps.is == this.props.is){
+            return false
+          } else {
+            return true
+          }
+        }*/
+  
     }, {
       key: 'componentDidMount',
       value: function componentDidMount() {
         window.scrolling = false;
   
+        var este = this;
+  
         _reactScroll.scroller.scrollTo(this.props.is, true, 0, 0);
+  
         if (typeof document !== 'undefined') {
           this.time = 0;
           this.modY = 0;
-          document.addEventListener('scroll', this.scrollHandler.bind(this));
+          document.addEventListener('scroll', este.scrollHandler.bind(este));
           document.addEventListener('scroll', this.scrolling.bind(this));
           document.addEventListener('keydown', this._keyPress.bind(this));
         }
@@ -2521,9 +2569,11 @@ module.exports =
       key: 'componentDidUpdate',
       value: function componentDidUpdate() {
   
-        if (!window['scrolling']) {
+        var este = this;
   
-          _reactScroll.scroller.scrollTo(this.props.is, true, 400, 0);
+        if (!window['scrolling']) {
+          console.log(22);
+          _reactScroll.scroller.scrollTo(este.props.is, true, 0, 0);
         }
       }
     }, {
@@ -2543,17 +2593,14 @@ module.exports =
             window['scrolling'] = false;
             clearTimeout(window['timer']);
           }
-        }, 200);
+        }, 400);
   
         window['lastY'] = window.scrollY;
       }
     }, {
       key: 'scrollHandler',
       value: function scrollHandler() {
-  
-        return false;
-        window.clearTimeout(window['tiempo_var']);
-        var este = this;
+        window['scrolling'] = true;
   
         if (this.props.servicio != undefined) {
   
@@ -2564,33 +2611,34 @@ module.exports =
           return false;
         }
   
-        window['tiempo_var'] = setTimeout(function () {
+        if (Math.abs(this.refs.inicio_obj.getBoundingClientRect().top) < parseInt(100)) {
   
-          if (window.scrolling) {
-            return false;
-          }
-          if (_reactScroll.scrollSpy.currentPositionY() > window.innerHeight * 0.1 && _reactScroll.scrollSpy.currentPositionY() < window.innerHeight * 1.1) {
-            _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/servicios'), {
-              state: this.props
-            }));
-          } else if (_reactScroll.scrollSpy.currentPositionY() > window.innerHeight * 1.1) {
-            _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/contacto'), {
-              state: this.props
-            }));
-          } else if (_reactScroll.scrollSpy.currentPositionY() < window.innerHeight * 0.1) {
-            if (_reactScroll.scrollSpy.currentPositionY() == 0) {
-              return false;
-            }
+          _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/inicio'), {
+            state: this.props && this.props.state || null
   
-            _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/inicio'), {
-              state: this.props
-            }));
-          } else if (window.innerHeight < _reactScroll.scrollSpy.currentPositionY()) {
-            este.handleResize();
-          }
+          }));
+        } else if (Math.abs(this.refs.servicios_obj.getBoundingClientRect().top) < parseInt(100)) {
   
-          window.clearTimeout(window['tiempo_var']);
-        }, 500);
+          _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/servicios'), {
+            state: this.props && this.props.state || null
+  
+          }));
+        } else if (Math.abs(this.refs.contacto_obj.getBoundingClientRect().top) < parseInt(100)) {
+  
+          _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/contacto'), {
+            state: this.props && this.props.state || null
+  
+          }));
+        } else if (Math.abs(this.refs.clientes_obj.getBoundingClientRect().top) < parseInt(100)) {
+  
+          _coreLocation2['default'].push(_extends({}, (0, _historyLibParsePath2['default'])('/clientes'), {
+            state: this.props && this.props.state || null
+  
+          }));
+        } else if (window.innerHeight < _reactScroll.scrollSpy.currentPositionY()) {
+          //este.handleResize()
+  
+        }
       }
     }, {
       key: 'componentWillUnmount',
@@ -2702,7 +2750,7 @@ module.exports =
               { name: 'inicio' },
               _react2['default'].createElement(
                 'div',
-                { className: _InitPageScss2['default'].element },
+                { className: _InitPageScss2['default'].element, ref: 'inicio_obj' },
                 _react2['default'].createElement(
                   'div',
                   { className: _InitPageScss2['default'].black_ground },
@@ -2730,7 +2778,7 @@ module.exports =
               { name: 'servicios', style: { backgroundImage: 'url(/fondo-servicios.jpg)', backgroundSize: 'cover' } },
               _react2['default'].createElement(
                 'div',
-                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].autofix, _InitPageScss2['default'].sizefix, _InitPageScss2['default'].clearfix) },
+                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].autofix, _InitPageScss2['default'].sizefix, _InitPageScss2['default'].clearfix), ref: 'servicios_obj' },
                 _react2['default'].createElement(
                   'div',
                   { className: (0, _classnames2['default'])(_InitPageScss2['default'].fullblack, _InitPageScss2['default'].right, _InitPageScss2['default'].sub, _InitPageScss2['default'].white, _InitPageScss2['default'].thin, _InitPageScss2['default'].clearfix), style: { textAlign: 'right' } },
@@ -2818,7 +2866,7 @@ module.exports =
               { name: 'contacto' },
               _react2['default'].createElement(
                 'div',
-                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].contacto_ip4, _InitPageScss2['default'].autofix, _InitPageScss2['default'].clearfix) },
+                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].contacto_ip4, _InitPageScss2['default'].autofix, _InitPageScss2['default'].clearfix), ref: 'contacto_obj' },
                 _react2['default'].createElement(
                   'div',
                   { className: (0, _classnames2['default'])(_InitPageScss2['default'].fullwhite_m, _InitPageScss2['default'].center, _InitPageScss2['default'].clearfix, _InitPageScss2['default'].nopad) },
@@ -2907,10 +2955,10 @@ module.exports =
               { name: 'clientes' },
               _react2['default'].createElement(
                 'div',
-                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].scrollable, _InitPageScss2['default'].clearfix, _InitPageScss2['default'].overflow) },
+                { className: (0, _classnames2['default'])(_InitPageScss2['default'].element, _InitPageScss2['default'].scrollable, _InitPageScss2['default'].clearfix, _InitPageScss2['default'].overflow), ref: 'clientes_obj' },
                 _react2['default'].createElement(
                   'div',
-                  { className: (0, _classnames2['default'])(_InitPageScss2['default'].fullwhite, _InitPageScss2['default'].center, _InitPageScss2['default'].nopad), style: { backgroundImage: 'url(' + __webpack_require__(55) + ')', backgroundSize: 'cover' } },
+                  { className: (0, _classnames2['default'])(_InitPageScss2['default'].fullwhite, _InitPageScss2['default'].center, _InitPageScss2['default'].nopad), style: { backgroundImage: 'url(' + __webpack_require__(55) + ')', backgroundSize: 'cover', paddingBottom: '60px' } },
                   _react2['default'].createElement(
                     'div',
                     { className: _InitPageScss2['default'].clientes_title_wrapper },
@@ -2923,7 +2971,7 @@ module.exports =
                 ),
                 _react2['default'].createElement(
                   'div',
-                  { className: (0, _classnames2['default'])(_InitPageScss2['default'].grid, _InitPageScss2['default'].white_bg, _InitPageScss2['default'].clearfix) },
+                  { className: (0, _classnames2['default'])(_InitPageScss2['default'].grid, _InitPageScss2['default'].white_bg, _InitPageScss2['default'].clearfix), style: { paddingBottom: '60px' } },
                   _react2['default'].createElement(
                     'div',
                     { className: _InitPageScss2['default'].client_holder },
